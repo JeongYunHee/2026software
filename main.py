@@ -5,6 +5,16 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from pathlib import Path
+
+st.write("실행 파일:", Path(__file__).resolve())
+st.write("pages 폴더 존재:", (
+    Path(__file__).parent / "pages"
+).is_dir())
+st.write("페이지 파일:", list(
+    (Path(__file__).parent / "pages").glob("*.py")
+))
+
 st.set_page_config(
     page_title="학생 학습 타이머",
     page_icon="📚",
