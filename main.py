@@ -17,6 +17,14 @@ st.set_page_config(
 # =====================================
 # 2. 세션 상태 초기화
 # =====================================
+
+# 오늘의 할 일 목록 초기화
+if "todo_list" not in st.session_state:
+    st.session_state.todo_list = []
+
+if "todo_next_id" not in st.session_state:
+    st.session_state.todo_next_id = 0
+
 if "subjects" not in st.session_state:
     st.session_state.subjects = [
         "국어", "영어", "수학", "과학", "사회"
@@ -350,9 +358,104 @@ def statistics_page():
         ]
     )
 
+# =====================================
+# 오늘의 할 일 페이지
+# =====================================
+def todo_page():
+    st.title("📝 오늘의 할 일")
+    st.write("오늘 공부할 과목과 할 일을 기록하세요.")
+
+    st.divider()
+
+    st.subheader("➕ 할 일 추가")
+
+    # 과목과 할 일 입력
+    with st.form("todo_form", clear_on_submit=True):
+        subject = st.selectbox(
+            "과목 선택",
+            st.session_state.subjects
+        )
+
+        task = st.text_input(
+            "할 일",
+            placeholder="예: 수학 문제집 20쪽 풀기"
+        )
+
+        submitted = st.form_submit_button(
+            "추가",
+            type="primary",
+            use_container_width=True
+        )
+
+    # 추가 버튼 처리
+    if submitted:
+        if not task.strip():
+            st.warning("할 일을 입력해주세요")
+        else:
+            st.session_state.todo_list.append({
+                "id": st.session_state.todo_next_id,
+                "subject": subject,
+                "task": task.strip(),
+                "completed": False
+            })
+
+            st.session_state.todo_next_id += 1
+            st.success("할 일이 추가되었습니다.")
+
+    st.divider()
+
+    st.subheader("📋 오늘의 할 일 목록")
+
+    todos = st.session_state.todo_list
+
+    if not todos:
+        st.info("아직 등록된 할 일이 없습니다.")
+        return
+
+    total = len(todos)
+    completed = sum(
+        1 for todo in todos if todo["completed"]
+    )
+
+    st.metric(
+        "완료한 할 일",
+        f"{completed} / {total}"
+    )
+
+    st.progress(completed / total)
+
+    # 할 일 목록 표시
+    for todo in todos[:]:
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            checked = st.checkbox(
+                f"[{todo['subject']}] {todo['task']}",
+                value=todo["completed"],
+                key=f"todo_check_{todo['id']}"
+            )
+
+            todo["completed"] = checked
+
+        with col2:
+            if st.button(
+                "삭제",
+                key=f"todo_delete_{todo['id']}"
+            ):
+                st.session_state.todo_list = [
+                    item
+                    for item in st.session_state.todo_list
+                    if item["id"] != todo["id"]
+                ]
+                st.rerun()
+
 
 # =====================================
 # 6. 사이드바 멀티페이지
+# =====================================
+
+# =====================================
+# 사이드바 멀티페이지
 # =====================================
 pages = {
     "학습 관리": [
@@ -361,6 +464,11 @@ pages = {
             title="학습 타이머",
             icon="⏱️",
             default=True
+        ),
+        st.Page(
+            todo_page,
+            title="오늘의 할 일",
+            icon="📝"
         ),
         st.Page(
             statistics_page,
