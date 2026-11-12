@@ -1,125 +1,160 @@
+import json
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="학습 타이머", page_icon="📚", layout="wide")
+st.set_page_config(page_title="학생 학습 타이머", page_icon="📚", layout="centered")
+DATA_FILE = Path(__file__).with_name("study_records.json")
+DEFAULT_SUBJECTS = ["국어", "영어", "수학", "과학", "사회", "기타"]
 
-SUBJECTS = ["국어", "수학", "영어", "한국사", "과학", "사회", "기타"]
+
+def load_records():
+    try:
+        data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, ValueError, OSError):
+        return []
+
+
+def save_records(records):
+    try:
+        DATA_FILE.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def format_seconds(seconds):
+    seconds = max(0, int(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
 
 if "records" not in st.session_state:
-    st.session_state.records = []
+    st.session_state.records = load_records()
+if "subjects" not in st.session_state:
+    st.session_state.subjects = DEFAULT_SUBJECTS.copy()
+if "subject" not in st.session_state:
+    st.session_state.subject = DEFAULT_SUBJECTS[0]
 if "running" not in st.session_state:
     st.session_state.running = False
-if "started_at" not in st.session_state:
-    st.session_state.started_at = None
 if "elapsed" not in st.session_state:
     st.session_state.elapsed = 0.0
-if "subject" not in st.session_state:
-    st.session_state.subject = SUBJECTS[0]
-if "segment_started" not in st.session_state:
-    st.session_state.segment_started = None
+if "started_at" not in st.session_state:
+    st.session_state.started_at = None
 
 
-def seconds_now():
-    total = st.session_state.elapsed
-    if st.session_state.running:
-        total += time.time() - st.session_state.started_at
-    return max(0, total)
-
-
-def clock(seconds):
-    seconds = int(seconds)
-    return f"{seconds // 3600:02d}:{seconds // 60 % 60:02d}:{seconds % 60:02d}"
+def current_elapsed():
+    elapsed = st.session_state.elapsed
+    if st.session_state.running and st.session_state.started_at is not None:
+        elapsed += time.monotonic() - st.session_state.started_at
+    return elapsed
 
 
 def pause():
+    if st.session_state.running:
+        st.session_state.elapsed = current_elapsed()
+        st.session_state.running = False
+        st.session_state.started_at = None
+
+
+def start():
     if not st.session_state.running:
-        return
-    now = datetime.now()
-    duration = max(0, time.time() - st.session_state.started_at)
-    st.session_state.elapsed += duration
+        st.session_state.started_at = time.monotonic()
+        st.session_state.running = True
+
+
+def reset():
     st.session_state.running = False
+    st.session_state.elapsed = 0.0
     st.session_state.started_at = None
-    if duration >= 1:
-        st.session_state.records.append({
-            "과목": st.session_state.subject,
-            "날짜": st.session_state.segment_started.strftime("%Y-%m-%d"),
-            "시작": st.session_state.segment_started.strftime("%H:%M:%S"),
-            "종료": now.strftime("%H:%M:%S"),
-            "공부 시간(초)": round(duration),
-        })
-    st.session_state.segment_started = None
 
 
-st.title("📚 나의 학습 타이머")
-st.caption("과목을 선택하고 공부를 시작해 보세요. 일시정지하면 학습 구간이 기록됩니다.")
+st.title("📚 학생 학습 타이머")
+st.caption("과목을 선택하고 공부 시간을 측정해 보세요!")
 
-selected = st.selectbox("공부할 과목", SUBJECTS, index=SUBJECTS.index(st.session_state.subject), disabled=st.session_state.running)
-if not st.session_state.running:
-    st.session_state.subject = selected
+with st.sidebar:
+    st.header("⚙️ 과목 관리")
+    new_subject = st.text_input("새 과목 이름", placeholder="예: 한국사")
+    if st.button("과목 추가", use_container_width=True):
+        name = new_subject.strip()
+        if not name:
+            st.warning("과목 이름을 입력하세요.")
+        elif name in st.session_state.subjects:
+            st.warning("이미 등록된 과목입니다.")
+        else:
+            st.session_state.subjects.append(name)
+            st.success(f"{name} 과목을 추가했습니다.")
+    st.info("Streamlit Cloud의 로컬 파일 저장은 재시작/재배포 시 사라질 수 있습니다. CSV로 기록을 내려받아 보관하세요.")
 
+subject = st.selectbox("공부할 과목", st.session_state.subjects, key="subject", disabled=st.session_state.running or st.session_state.elapsed > 0)
 
 @st.fragment(run_every="1s")
 def timer_display():
     st.markdown(
-        f"<div style='text-align:center;font-size:clamp(3rem,9vw,6rem);font-weight:750;letter-spacing:3px;padding:20px 0'>{clock(seconds_now())}</div>",
+        f"<div style='text-align:center;font-size:clamp(3rem,10vw,5rem);font-weight:800;padding:22px 0'>"
+        f"{format_seconds(current_elapsed())}</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(f"<p style='text-align:center'>{'🟢 측정 중' if st.session_state.running else '⏸ 대기 / 일시정지'}</p>", unsafe_allow_html=True)
+    st.caption("🟢 측정 중" if st.session_state.running else "⏸️ 대기 / 일시정지")
 
 
 timer_display()
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    if st.button("▶ 시작", use_container_width=True, type="primary", disabled=st.session_state.running):
-        st.session_state.started_at = time.time()
-        st.session_state.segment_started = datetime.now()
-        st.session_state.running = True
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("▶️ 시작", use_container_width=True, disabled=st.session_state.running):
+        start()
         st.rerun()
-with c2:
-    if st.button("⏸ 일시정지", use_container_width=True, disabled=not st.session_state.running):
+with col2:
+    if st.button("⏸️ 일시정지", use_container_width=True, disabled=not st.session_state.running):
         pause()
         st.rerun()
-with c3:
-    if st.button("↺ 초기화", use_container_width=True):
-        if st.session_state.running:
-            pause()
-        st.session_state.elapsed = 0.0
+with col3:
+    if st.button("🔄 초기화", use_container_width=True):
+        reset()
+        st.rerun()
+
+if st.button("💾 현재 공부 시간 기록하기", type="primary", use_container_width=True):
+    pause()
+    seconds = int(current_elapsed())
+    if seconds < 1:
+        st.warning("1초 이상 공부한 후 기록해 주세요.")
+    else:
+        st.session_state.records.append({
+            "날짜": datetime.now().strftime("%Y-%m-%d"),
+            "시각": datetime.now().strftime("%H:%M:%S"),
+            "과목": st.session_state.subject,
+            "공부시간(초)": seconds,
+        })
+        saved = save_records(st.session_state.records)
+        reset()
+        st.success("공부 시간이 기록되었습니다!" + ("" if saved else " (파일 저장 실패: CSV로 내려받으세요.)"))
         st.rerun()
 
 st.divider()
-st.subheader("📊 공부 통계")
-df = pd.DataFrame(st.session_state.records)
-if df.empty:
-    st.info("아직 저장된 학습 기록이 없습니다. 공부를 시작해 보세요!")
+st.subheader("📊 과목별 공부 기록")
+records = st.session_state.records
+if records:
+    df = pd.DataFrame(records)
+    totals = df.groupby("과목", as_index=False)["공부시간(초)"].sum()
+    totals["총 공부 시간"] = totals["공부시간(초)"].map(format_seconds)
+    a, b = st.columns(2)
+    a.metric("총 공부 시간", format_seconds(df["공부시간(초)"].sum()))
+    b.metric("총 학습 횟수", f"{len(df)}회")
+    st.dataframe(totals[["과목", "총 공부 시간"]], hide_index=True, use_container_width=True)
+    st.bar_chart(totals.set_index("과목")["공부시간(초)"], x_label="과목", y_label="공부 시간(초)")
+    st.subheader("🗓️ 상세 기록")
+    detail = df.copy()
+    detail["공부 시간"] = detail["공부시간(초)"].map(format_seconds)
+    st.dataframe(detail[["날짜", "시각", "과목", "공부 시간"]].iloc[::-1], hide_index=True, use_container_width=True)
+    st.download_button("⬇️ 기록 CSV 다운로드", data=df.to_csv(index=False).encode("utf-8-sig"), file_name="study_records.csv", mime="text/csv", use_container_width=True)
+    if st.button("🗑️ 모든 기록 삭제"):
+        st.session_state.records = []
+        save_records([])
+        st.rerun()
 else:
-    today = datetime.now().strftime("%Y-%m-%d")
-    today_seconds = int(df.loc[df["날짜"] == today, "공부 시간(초)"].sum())
-    total_seconds = int(df["공부 시간(초)"].sum())
-    a, b, c = st.columns(3)
-    a.metric("오늘 공부 시간", clock(today_seconds))
-    b.metric("누적 공부 시간", clock(total_seconds))
-    c.metric("기록된 학습 구간", f"{len(df)}회")
-
-    by_subject = df.groupby("과목")["공부 시간(초)"].sum().div(60).round(1)
-    st.markdown("**과목별 누적 공부 시간 (분)**")
-    st.bar_chart(by_subject, horizontal=True)
-
-    st.subheader("📝 학습 기록")
-    view = df.copy()
-    view["공부 시간"] = view["공부 시간(초)"].map(clock)
-    st.dataframe(view[["날짜", "과목", "시작", "종료", "공부 시간"]].iloc[::-1], hide_index=True, use_container_width=True)
-
-    st.download_button("⬇ CSV 다운로드", data=df.to_csv(index=False).encode("utf-8-sig"), file_name="study_records.csv", mime="text/csv")
-
-    with st.expander("기록 삭제"):
-        labels = [f"{i + 1}. {r['날짜']} / {r['과목']} / {r['시작']} / {clock(r['공부 시간(초)'])}" for i, r in enumerate(st.session_state.records)]
-        selected_record = st.selectbox("삭제할 학습 구간", range(len(labels)), format_func=lambda i: labels[i])
-        if st.button("선택한 기록 삭제"):
-            st.session_state.records.pop(selected_record)
-            st.rerun()
-
-st.caption("※ 기록은 현재 Streamlit 세션에만 저장됩니다. 장기 보관하려면 CSV로 내려받으세요.")
+    st.info("아직 기록이 없습니다. 공부를 시작하고 시간을 기록해 보세요!")
