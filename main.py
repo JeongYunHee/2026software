@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="학생 학습 타이머", page_icon="📚", layout="centered")
+# st.set_page_config(page_title="학생 학습 타이머", page_icon="📚", layout="centered")
 st.sidebar.title("📚 학습 관리")
 st.sidebar.page_link(
     "main.py",
