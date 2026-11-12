@@ -11,13 +11,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# 사이드바
-st.sidebar.title("📚 학습 관리")
-st.sidebar.page_link(
-    "pages/01_todo.py",
-    label="📝 오늘의 할 일"
-)
-
 DEFAULT_SUBJECTS = ["국어", "영어", "수학", "과학", "사회", "기타"]
 
 for key, value in {
