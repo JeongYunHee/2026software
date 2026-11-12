@@ -9,10 +9,10 @@ st.sidebar.page_link(
     "main.py",
     label="⏱️ 학습 타이머"
 )
-st.sidebar.page_link(
-    "pages/01_todo.py",
-    label="📝 오늘의 할 일"
-)
+# st.sidebar.page_link(
+#     "pages/01_todo.py",
+#     label="📝 오늘의 할 일"
+# )
 
 st.set_page_config(page_title="학생 학습 타이머", page_icon="📚", layout="centered")
 
