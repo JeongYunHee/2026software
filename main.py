@@ -11,24 +11,6 @@ st.set_page_config(
     layout="centered"
 )
 
-st.sidebar.title("📚 학습 관리")
-
-st.sidebar.page_link(
-    "main.py",
-    label="⏱️ 학습 타이머"
-)
-
-st.sidebar.page_link(
-    "pages/01_todo.py",
-    label="📝 오늘의 할 일"
-)
-
-st.sidebar.page_link(
-    "pages/02_review.py",
-    label="📖 복습 관리"
-)
-
-
 st.set_page_config(page_title="학생 학습 타이머", page_icon="📚", layout="centered")
 
 DEFAULT_SUBJECTS = ["국어", "영어", "수학", "과학", "사회", "기타"]
